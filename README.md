@@ -64,6 +64,20 @@ npx vh-singlefile list page.html [query]
 Restoring is handled entirely in the browser by the injected widget — no
 server needed.
 
+## Claude Code skill
+
+If you use Claude Code, this installs a skill so you can drive it with
+`/version-history-widget` (or by just describing what you want) instead
+of typing the CLI commands yourself:
+
+```bash
+npx version-history-widget skill
+```
+
+This copies a `SKILL.md` into `~/.claude/skills/version-history-widget/`
+on your machine. It's per-machine — anyone else who wants the slash
+command needs to run this once on their own machine too.
+
 ## How it works
 
 - No runtime dependencies — only Node's built-in `fs`, `path`, `http`, and

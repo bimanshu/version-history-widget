@@ -4,8 +4,10 @@
    node vh.js record "Title" [-d "details" | -f details.txt]   — snapshot changed files as a new version
    node vh.js restore <id>               — snapshot current state, then restore version <id>
    node vh.js list [query]               — list versions (optionally filtered by title/details)
+   node vh.js skill                      — install the Claude Code skill (~/.claude/skills) so
+                                            /version-history-widget works in Claude Code sessions
    Env: VH_ROOT (project root, default cwd) */
-const fs = require('fs'), path = require('path');
+const fs = require('fs'), path = require('path'), os = require('os');
 const ROOT = path.resolve(process.env.VH_ROOT || process.cwd());
 const VDIR = path.join(ROOT, '.versions'), SNAP = path.join(VDIR, 'snapshots'), MAN = path.join(VDIR, 'manifest.json');
 const IGNORE = new Set(['node_modules', '.git', '.versions', 'dist', 'build', '.next', '.nuxt', 'coverage', '.cache']);
@@ -115,5 +117,10 @@ if (cmd === 'init') {
 } else if (cmd === 'list') {
   const q = (args[0] || '').toLowerCase();
   for (const v of readMan()) if (!q || v.title.toLowerCase().includes(q) || (v.details || '').toLowerCase().includes(q)) console.log(String(v.id).padStart(3) + '  ' + v.time.slice(0, 16).replace('T', ' ') + '  ' + v.title);
+} else if (cmd === 'skill') {
+  const dest = path.join(os.homedir(), '.claude', 'skills', 'version-history-widget');
+  fs.mkdirSync(dest, { recursive: true });
+  fs.copyFileSync(path.join(__dirname, 'skill', 'SKILL.md'), path.join(dest, 'SKILL.md'));
+  console.log('Installed Claude Code skill to ' + dest + '. Restart Claude Code (or start a new session) and try /version-history-widget.');
 } else { console.log(fs.readFileSync(__filename, 'utf8').split('*/')[0].split('\n').slice(1).join('\n')); }
 module.exports = { restore: id => { const { execFileSync } = require('child_process'); return execFileSync(process.execPath, [__filename, 'restore', String(id)], { cwd: ROOT, env: process.env }).toString(); } };
