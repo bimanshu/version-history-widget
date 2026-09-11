@@ -1,6 +1,6 @@
 {
   "name": "version-history-widget",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Zero-dependency version history for web projects: snapshots every change and adds a floating widget to browse, search, and restore any version.",
   "keywords": ["version history", "undo", "snapshot", "restore", "dev-tool", "widget"],
   "license": "MIT",
@@ -8,6 +8,7 @@
   "engines": { "node": ">=14" },
   "main": "./middleware.js",
   "bin": {
+    "version-history-widget": "./vh.js",
     "vh": "./vh.js",
     "vh-singlefile": "./singlefile.js"
   },
