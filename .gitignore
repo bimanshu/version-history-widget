@@ -1,0 +1,4 @@
+node_modules/
+.versions/
+.DS_Store
+.claude/

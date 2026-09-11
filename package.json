@@ -1,0 +1,29 @@
+{
+  "name": "version-history-widget",
+  "version": "0.1.0",
+  "description": "Zero-dependency version history for web projects: snapshots every change and adds a floating widget to browse, search, and restore any version.",
+  "keywords": ["version history", "undo", "snapshot", "restore", "dev-tool", "widget"],
+  "license": "MIT",
+  "author": "bimanshu <bimanshuvatsa@gmail.com>",
+  "engines": { "node": ">=14" },
+  "main": "./middleware.js",
+  "bin": {
+    "vh": "./vh.js",
+    "vh-singlefile": "./singlefile.js"
+  },
+  "files": [
+    "vh.js",
+    "widget.js",
+    "middleware.js",
+    "serve.js",
+    "singlefile.js"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bimanshu/version-history-widget.git"
+  },
+  "homepage": "https://github.com/bimanshu/version-history-widget#readme",
+  "bugs": {
+    "url": "https://github.com/bimanshu/version-history-widget/issues"
+  }
+}
