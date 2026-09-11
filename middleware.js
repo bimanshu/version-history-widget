@@ -1,11 +1,18 @@
-/* Connect/Express/Vite-compatible middleware: serves /.versions/* and handles POST /__vh/restore/:id
+/* Connect/Express/Vite-compatible middleware: serves /.versions/*, handles POST /__vh/restore/:id,
+   and auto-records every change as a new version while the dev server is running.
    Express:  app.use(require('./.versions/middleware.js')())
    Vite:     plugins:[{ name:'vh', configureServer(s){ s.middlewares.use(require('./.versions/middleware.js')()) } }]
-   Next:     use serve.js alongside, or add a route handler that calls require('./.versions/vh.js').restore(id) */
+   Next:     use serve.js alongside, or add a route handler that calls require('./.versions/vh.js').restore(id)
+   Pass { watch: false } to opt out of auto-recording. */
 const fs = require('fs'), path = require('path');
 module.exports = function (opts = {}) {
   const root = path.resolve(opts.root || process.env.VH_ROOT || process.cwd()), vdir = path.join(root, '.versions');
   const types = { '.js': 'text/javascript', '.json': 'application/json', '.diff': 'text/plain' };
+  if (opts.watch !== false && fs.existsSync(vdir)) {
+    process.env.VH_ROOT = root;   // vh.js resolves its root from this at require time
+    try { require(path.join(vdir, 'vh.js')).watch({ keepAlive: false }); }
+    catch (e) { console.error('[vh] auto-record unavailable: ' + e.message); }
+  }
   return function (req, res, next) {
     const url = (req.url || '').split('?')[0];
     if (req.method === 'POST' && url.startsWith('/__vh/restore/')) {

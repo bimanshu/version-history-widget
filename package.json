@@ -1,6 +1,6 @@
 {
   "name": "version-history-widget",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Zero-dependency version history for web projects: snapshots every change and adds a floating widget to browse, search, and restore any version.",
   "keywords": ["version history", "undo", "snapshot", "restore", "dev-tool", "widget"],
   "license": "MIT",
