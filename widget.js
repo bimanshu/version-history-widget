@@ -3,7 +3,8 @@
   if (window.__vhLoaded) return; window.__vhLoaded = true;
   var Z = 2147483647, MODE = document.getElementById('vh-store') ? 'single' : 'project';
   var css = '\
-.vh-pill{position:fixed;right:16px;top:16px;z-index:' + Z + ';font:13px/1 system-ui,sans-serif;background:#111;color:#fff;border:0;border-radius:999px;padding:10px 14px;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.35)}\
+.vh-pill{position:fixed;right:16px;top:16px;z-index:' + Z + ';font:13px/1 system-ui,sans-serif;background:#111;color:#fff;border:0;border-radius:999px;padding:10px 14px;cursor:grab;box-shadow:0 6px 20px rgba(0,0,0,.35);touch-action:none;user-select:none}\
+.vh-pill.vh-dragging{cursor:grabbing}\
 .vh-panel{position:fixed;right:16px;top:56px;width:440px;max-width:calc(100vw - 32px);max-height:70vh;z-index:' + Z + ';background:#fff;color:#111;border:1px solid #ddd;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.35);font:13px/1.4 system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden}\
 .vh-head{display:flex;gap:8px;padding:10px;border-bottom:1px solid #eee;align-items:center}\
 .vh-search{flex:1;padding:8px 10px;border:1px solid #ccc;border-radius:8px;font:inherit;outline:none}.vh-search:focus{border-color:#111}\
@@ -69,16 +70,65 @@
     });
   }
 
+  var POS_KEY = 'vh-pill-pos';
+  function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+  function loadPos() { try { var p = JSON.parse(localStorage.getItem(POS_KEY)); if (p && isFinite(p.left) && isFinite(p.top)) return p; } catch (e) { } return null; }
+  function savePos(p) { try { localStorage.setItem(POS_KEY, JSON.stringify(p)); } catch (e) { } }
+  function placePill(left, top) {
+    var r = pill.getBoundingClientRect();
+    left = clamp(left, 8, window.innerWidth - r.width - 8);
+    top = clamp(top, 8, window.innerHeight - r.height - 8);
+    pill.style.left = left + 'px'; pill.style.top = top + 'px'; pill.style.right = 'auto'; pill.style.bottom = 'auto';
+    return { left: left, top: top };
+  }
+  function positionPanel() {
+    var r = pill.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
+    var w = Math.min(440, vw - 16), h = Math.min(vh * 0.7, panel.scrollHeight || vh * 0.7);
+    var top = (vh - r.bottom >= h + 8 || vh - r.bottom >= r.top) ? r.bottom + 8 : r.top - h - 8;
+    top = clamp(top, 8, vh - h - 8);
+    var left = clamp(r.right - w, 8, vw - w - 8);
+    panel.style.top = top + 'px'; panel.style.left = left + 'px'; panel.style.right = 'auto'; panel.style.bottom = 'auto'; panel.style.width = w + 'px';
+  }
+  function initDrag() {
+    var saved = loadPos(); if (saved) placePill(saved.left, saved.top);
+    var dragging = false, moved = false, startX, startY, baseLeft, baseTop;
+    function start(x, y) {
+      var r = pill.getBoundingClientRect();
+      dragging = true; moved = false; startX = x; startY = y; baseLeft = r.left; baseTop = r.top;
+      pill.classList.add('vh-dragging');
+    }
+    function moveTo(x, y) {
+      if (!dragging) return;
+      if (Math.abs(x - startX) > 3 || Math.abs(y - startY) > 3) moved = true;
+      if (!moved) return;
+      placePill(baseLeft + (x - startX), baseTop + (y - startY));
+      if (open) positionPanel();
+    }
+    function end() {
+      if (!dragging) return;
+      dragging = false; pill.classList.remove('vh-dragging');
+      if (moved) { var r = pill.getBoundingClientRect(); savePos({ left: r.left, top: r.top }); }
+    }
+    pill.addEventListener('mousedown', function (e) { start(e.clientX, e.clientY); e.preventDefault(); });
+    document.addEventListener('mousemove', function (e) { moveTo(e.clientX, e.clientY); });
+    document.addEventListener('mouseup', end);
+    pill.addEventListener('touchstart', function (e) { var t = e.touches[0]; start(t.clientX, t.clientY); }, { passive: true });
+    document.addEventListener('touchmove', function (e) { if (!dragging) return; var t = e.touches[0]; moveTo(t.clientX, t.clientY); }, { passive: true });
+    document.addEventListener('touchend', end);
+    pill.onclick = function () { if (moved) { moved = false; return; } toggle(); };
+    window.addEventListener('resize', function () { var r = pill.getBoundingClientRect(); placePill(r.left, r.top); if (open) positionPanel(); });
+  }
   function build() {
-    pill = document.createElement('button'); pill.className = 'vh-pill'; pill.textContent = 'Versions'; pill.onclick = toggle; document.body.appendChild(pill);
+    pill = document.createElement('button'); pill.className = 'vh-pill'; pill.textContent = 'Versions'; document.body.appendChild(pill);
     panel = document.createElement('div'); panel.className = 'vh-panel'; panel.style.display = 'none';
     panel.innerHTML = '<div class="vh-head"><input class="vh-search" placeholder="Search versions\u2026"><button class="vh-clear" title="Clear">\u00D7</button></div><div class="vh-list"></div><div class="vh-note"></div>';
     var inp = panel.querySelector('.vh-search'); inp.oninput = function () { query = inp.value; render(); };
     panel.querySelector('.vh-clear').onclick = function () { inp.value = ''; query = ''; render(); inp.focus(); };
     document.addEventListener('keydown', function (e) { if (e.key !== 'Escape' || !open) return; if (query) { inp.value = ''; query = ''; render(); } else toggle(); });
     document.body.appendChild(panel);
+    initDrag();
   }
-  function toggle() { open = !open; if (open) load(function () { panel.style.display = 'flex'; render(); panel.querySelector('.vh-search').focus(); }); else panel.style.display = 'none'; }
+  function toggle() { open = !open; if (open) load(function () { panel.style.display = 'flex'; positionPanel(); render(); panel.querySelector('.vh-search').focus(); }); else panel.style.display = 'none'; }
   function init() { build(); load(render); }
   if (document.body) init(); else document.addEventListener('DOMContentLoaded', init);
 })();

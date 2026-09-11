@@ -28,7 +28,12 @@ npx vh init                 # sets up .versions/, injects the widget, saves vers
 npx vh record "Title" -d "what changed and why"
 npx vh restore 4            # safety-snapshots current state, then restores version 4
 npx vh list [query]         # list versions, optionally filtered
+npx vh update               # refresh .versions/*.js from the currently installed package
 ```
+
+`vh init` only copies `widget.js` (and friends) into `.versions/` once. If
+you upgrade the package later and want an already-initialized site to pick
+up widget changes (new styling, bug fixes, etc.), run `vh update`.
 
 Serve it so the restore button works:
 
@@ -86,6 +91,10 @@ command needs to run this once on their own machine too.
   are exact and history is human-readable.
 - The widget (`widget.js`) is vanilla JS + inline CSS, scoped under `vh-`
   class names so it never collides with your site's styles.
+- The "Versions" pill is draggable — click and drag it anywhere on screen
+  (works with touch too), and its position is remembered per-browser via
+  `localStorage`. The panel it opens repositions itself next to wherever
+  the pill currently is.
 
 ## Customizing the widget UI
 

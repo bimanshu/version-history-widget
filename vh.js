@@ -4,6 +4,8 @@
    node vh.js record "Title" [-d "details" | -f details.txt]   — snapshot changed files as a new version
    node vh.js restore <id>               — snapshot current state, then restore version <id>
    node vh.js list [query]               — list versions (optionally filtered by title/details)
+   node vh.js update                     — refresh the vendored widget.js/vh.js/serve.js/middleware.js
+                                            in .versions/ from the installed package (run after upgrading)
    node vh.js skill                      — install the Claude Code skill (~/.claude/skills) so
                                             /version-history-widget works in Claude Code sessions
    Env: VH_ROOT (project root, default cwd) */
@@ -84,10 +86,15 @@ function injectWidget() {
   return null;
 }
 
+function vendorFiles() {
+  fs.mkdirSync(VDIR, { recursive: true });
+  for (const f of ['widget.js', 'vh.js', 'serve.js', 'middleware.js']) { const src = path.join(__dirname, f); if (fs.existsSync(src) && src !== path.join(VDIR, f)) fs.copyFileSync(src, path.join(VDIR, f)); }
+}
+
 const cmd = process.argv[2], args = process.argv.slice(3);
 if (cmd === 'init') {
   fs.mkdirSync(SNAP, { recursive: true });
-  for (const f of ['widget.js', 'vh.js', 'serve.js', 'middleware.js']) { const src = path.join(__dirname, f); if (fs.existsSync(src) && src !== path.join(VDIR, f)) fs.copyFileSync(src, path.join(VDIR, f)); }
+  vendorFiles();
   if (!fs.existsSync(MAN)) writeMan([]);
   const gi = path.join(ROOT, '.gitignore'); const line = '.versions/snapshots/';
   if (!fs.existsSync(gi) || !fs.readFileSync(gi, 'utf8').includes(line)) fs.appendFileSync(gi, '\n' + line + '\n');
@@ -117,6 +124,10 @@ if (cmd === 'init') {
 } else if (cmd === 'list') {
   const q = (args[0] || '').toLowerCase();
   for (const v of readMan()) if (!q || v.title.toLowerCase().includes(q) || (v.details || '').toLowerCase().includes(q)) console.log(String(v.id).padStart(3) + '  ' + v.time.slice(0, 16).replace('T', ' ') + '  ' + v.title);
+} else if (cmd === 'update') {
+  if (!fs.existsSync(VDIR)) { console.error('No .versions/ here — run `vh init` first.'); process.exit(1); }
+  vendorFiles();
+  console.log('Updated .versions/{widget.js,vh.js,serve.js,middleware.js} from version-history-widget@' + require('./package.json').version + '. Reload the site to pick up widget changes.');
 } else if (cmd === 'skill') {
   const dest = path.join(os.homedir(), '.claude', 'skills', 'version-history-widget');
   fs.mkdirSync(dest, { recursive: true });
