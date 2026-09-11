@@ -3,8 +3,8 @@
   if (window.__vhLoaded) return; window.__vhLoaded = true;
   var Z = 2147483647, MODE = document.getElementById('vh-store') ? 'single' : 'project';
   var css = '\
-.vh-pill{position:fixed;right:16px;bottom:16px;z-index:' + Z + ';font:13px/1 system-ui,sans-serif;background:#111;color:#fff;border:0;border-radius:999px;padding:10px 14px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)}\
-.vh-panel{position:fixed;right:16px;bottom:56px;width:440px;max-width:calc(100vw - 32px);max-height:70vh;z-index:' + Z + ';background:#fff;color:#111;border:1px solid #ddd;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.25);font:13px/1.4 system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden}\
+.vh-pill{position:fixed;right:16px;top:16px;z-index:' + Z + ';font:13px/1 system-ui,sans-serif;background:#111;color:#fff;border:0;border-radius:999px;padding:10px 14px;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.35)}\
+.vh-panel{position:fixed;right:16px;top:56px;width:440px;max-width:calc(100vw - 32px);max-height:70vh;z-index:' + Z + ';background:#fff;color:#111;border:1px solid #ddd;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.35);font:13px/1.4 system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden}\
 .vh-head{display:flex;gap:8px;padding:10px;border-bottom:1px solid #eee;align-items:center}\
 .vh-search{flex:1;padding:8px 10px;border:1px solid #ccc;border-radius:8px;font:inherit;outline:none}.vh-search:focus{border-color:#111}\
 .vh-clear{border:0;background:#eee;border-radius:6px;padding:6px 8px;cursor:pointer}\
