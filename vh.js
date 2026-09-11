@@ -89,6 +89,10 @@ function injectWidget() {
 function vendorFiles() {
   fs.mkdirSync(VDIR, { recursive: true });
   for (const f of ['widget.js', 'vh.js', 'serve.js', 'middleware.js']) { const src = path.join(__dirname, f); if (fs.existsSync(src) && src !== path.join(VDIR, f)) fs.copyFileSync(src, path.join(VDIR, f)); }
+  // Force CommonJS for everything under .versions/, regardless of the host
+  // project's own package.json — otherwise a host with "type":"module" makes
+  // Node treat these vendored .js files as ESM and `require` disappears.
+  fs.writeFileSync(path.join(VDIR, 'package.json'), JSON.stringify({ type: 'commonjs' }, null, 2) + '\n');
 }
 
 const cmd = process.argv[2], args = process.argv.slice(3);
