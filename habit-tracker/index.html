@@ -1,0 +1,913 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f5f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111312" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Habit 30">
+<meta name="description" content="A 30-day habit tracker that runs offline on your phone.">
+<title>Habit 30</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+:root {
+  --bg: #f6f5f1; --surface: #ffffff; --surface-2: #efeee8; --bar: rgba(246, 245, 241, .88);
+  --text: #1c1d1b; --muted: #6a6c66; --line: #e3e1d9;
+  --accent: #2f7d5b; --on-accent: #ffffff; --accent-soft: #e2f1e8; --danger: #b3261e;
+  --l0: #ecebe5; --l1: #cfe6d9; --l2: #9fd0b5; --l3: #5fb08a; --l4: #2f7d5b;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .05), 0 4px 16px rgba(0, 0, 0, .05);
+  --radius: 18px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111312; --surface: #1b1e1c; --surface-2: #242826; --bar: rgba(17, 19, 18, .88);
+    --text: #ecece8; --muted: #9a9d99; --line: #2e322f;
+    --accent: #4fbf8b; --on-accent: #08130d; --accent-soft: #1d3428; --danger: #f2867e;
+    --l0: #242826; --l1: #1f3f30; --l2: #2a6347; --l3: #3c8f66; --l4: #4fbf8b;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+    color-scheme: dark;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased; min-height: 100vh; min-height: 100dvh;
+}
+body.locked { overflow: hidden; }
+button, input { font: inherit; color: inherit; }
+button {
+  cursor: pointer; background: none; border: 0; padding: 0;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation; user-select: none; -webkit-user-select: none;
+}
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+h1, h2, h3, p { margin: 0; }
+
+.app {
+  max-width: 520px; margin: 0 auto;
+  padding: calc(env(safe-area-inset-top) + 12px) max(16px, env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 96px) max(16px, env(safe-area-inset-left));
+}
+.view > * + * { margin-top: 12px; }
+
+/* Header */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 0 4px; }
+.eyebrow { font-size: 13px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+h1 { font-size: 34px; line-height: 1.1; font-weight: 750; letter-spacing: -.02em; }
+h1 .of { font-size: 20px; font-weight: 600; color: var(--muted); margin-left: 6px; letter-spacing: 0; }
+.date { margin-top: 6px; color: var(--muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pill { font-size: 12px; font-weight: 650; padding: 3px 9px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); }
+.ring { position: relative; width: 76px; height: 76px; flex: none; }
+.ring svg { width: 100%; height: 100%; display: block; }
+.ring circle { fill: none; stroke-width: 7; }
+.ring-bg { stroke: var(--l0); }
+.ring-fg { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset .5s cubic-bezier(.2, .8, .2, 1); }
+.ring-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 750; font-size: 20px; font-variant-numeric: tabular-nums; }
+.ring-label small { font-size: 13px; color: var(--muted); font-weight: 600; }
+.ring.full .ring-label { color: var(--accent); }
+
+/* Day strip */
+.strip {
+  position: relative; display: flex; gap: 6px; overflow-x: auto; scroll-snap-type: x proximity;
+  margin-left: -16px; margin-right: -16px; padding: 6px 16px 10px; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.strip::-webkit-scrollbar { display: none; }
+.day {
+  position: relative; flex: none; width: 46px; height: 62px; border-radius: 14px; scroll-snap-align: center;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  background: var(--l0); border: 2px solid transparent; transition: transform .15s;
+}
+.day:active { transform: scale(.94); }
+.dw { font-size: 11px; font-weight: 650; text-transform: uppercase; opacity: .65; }
+.dn { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.day.is-sel { border-color: var(--text); }
+.day.is-today::after { content: ""; position: absolute; bottom: 6px; width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
+.lv0 { background: var(--l0); }
+.lv1 { background: var(--l1); }
+.lv2 { background: var(--l2); }
+.lv3 { background: var(--l3); color: #fff; }
+.lv4 { background: var(--l4); color: var(--on-accent); }
+.lvf { background: transparent; box-shadow: inset 0 0 0 1.5px var(--line); color: var(--muted); }
+@media (prefers-color-scheme: dark) { .lv3 { color: var(--text); } }
+
+/* Habits */
+.section-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 2px 0; }
+.section-head h2 { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.link { color: var(--accent); font-weight: 650; font-size: 15px; padding: 6px 4px; }
+.habits { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.habit {
+  width: 100%; min-height: 74px; display: flex; align-items: center; gap: 14px; padding: 14px 16px; text-align: left;
+  background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); transition: background .2s, transform .12s;
+}
+.habit:active { transform: scale(.985); }
+.habit:disabled { cursor: default; opacity: .55; }
+.habit:disabled:active { transform: none; }
+.emoji { font-size: 24px; width: 44px; height: 44px; border-radius: 12px; background: var(--surface-2); display: grid; place-items: center; flex: none; }
+.habit .body { flex: 1; min-width: 0; }
+.habit .name { display: block; font-weight: 650; font-size: 17px; overflow-wrap: anywhere; }
+.habit .meta { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
+.check { width: 32px; height: 32px; flex: none; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; transition: background .2s, border-color .2s; }
+.check svg { width: 18px; height: 18px; fill: none; stroke: var(--on-accent); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transform: scale(.5); transition: opacity .2s, transform .2s; }
+.habit.is-done { background: var(--accent-soft); }
+.habit.is-done .emoji { background: var(--surface); }
+.habit.is-done .check { background: var(--accent); border-color: var(--accent); }
+.habit.is-done .check svg { opacity: 1; transform: none; }
+.habit.pop .check { animation: pop .35s ease-out; }
+@keyframes pop { 0% { transform: scale(.6); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+.add-card {
+  width: 100%; padding: 16px; border-radius: var(--radius); border: 1.5px dashed var(--line); color: var(--muted);
+  font-weight: 650; display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.banner { display: flex; gap: 10px; align-items: center; padding: 12px 14px; border-radius: 14px; background: var(--surface-2); font-size: 15px; }
+.banner.good { background: var(--accent-soft); color: var(--accent); font-weight: 650; }
+.banner .grow { flex: 1; }
+.banner .x { width: 32px; height: 32px; border-radius: 8px; color: var(--muted); font-size: 20px; line-height: 1; flex: none; }
+.sub { font-size: 13px; color: var(--muted); font-weight: 600; padding: 4px 2px 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { padding: 9px 13px; border-radius: 99px; background: var(--surface); box-shadow: inset 0 0 0 1.5px var(--line); font-size: 14px; font-weight: 550; }
+.chip:active { background: var(--accent-soft); }
+
+/* Cards & buttons */
+.card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; }
+.card > * + * { margin-top: 12px; }
+.card h2 { font-size: 20px; font-weight: 750; letter-spacing: -.01em; }
+.card p { color: var(--muted); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 16px; border-radius: 14px; background: var(--surface-2); font-weight: 650; }
+.btn.primary { background: var(--accent); color: var(--on-accent); }
+.btn.danger { color: var(--danger); }
+.btn.block { width: 100%; }
+.row { display: flex; gap: 10px; }
+.row .btn { flex: 1; }
+
+/* Progress */
+.page-title { font-size: 28px; font-weight: 750; letter-spacing: -.02em; padding: 8px 0 4px; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tile { padding: 14px 16px; }
+.tile > * + * { margin-top: 0; }
+.tile .k { font-size: 13px; color: var(--muted); font-weight: 600; }
+.tile .v { color: var(--text); font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.tile .s { font-size: 12px; color: var(--muted); }
+.cal-head { display: flex; align-items: baseline; justify-content: space-between; }
+.cal-head h2 { font-size: 17px; }
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.cal .wd { font-size: 11px; color: var(--muted); text-align: center; font-weight: 650; text-transform: uppercase; }
+.cal .c { position: relative; aspect-ratio: 1; border-radius: 10px; font-weight: 650; font-size: 14px; font-variant-numeric: tabular-nums; }
+.cal .c.is-today { box-shadow: inset 0 0 0 2px var(--text); }
+.legend { display: flex; align-items: center; justify-content: flex-end; gap: 4px; font-size: 12px; color: var(--muted); }
+.legend i { width: 12px; height: 12px; border-radius: 3px; }
+.hstat header { display: flex; align-items: center; gap: 12px; }
+.hstat h3 { flex: 1; min-width: 0; font-size: 16px; font-weight: 650; overflow-wrap: anywhere; }
+.hstat strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.cells { display: flex; gap: 2px; }
+.cells i { flex: 1; height: 20px; border-radius: 3px; background: var(--l0); }
+.cells i.y { background: var(--accent); }
+.cells i.f { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
+.hstat .meta { font-size: 13px; color: var(--muted); }
+.empty { text-align: center; color: var(--muted); padding: 32px 16px; }
+
+/* Setup */
+.list { list-style: none; margin: 0; padding: 0; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+.list li { display: flex; align-items: center; gap: 2px; padding: 6px 6px 6px 4px; border-top: 1px solid var(--line); }
+.list li:first-child { border-top: 0; }
+.hedit { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 6px 8px; text-align: left; font-weight: 600; overflow-wrap: anywhere; }
+.icon-btn { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; color: var(--muted); flex: none; }
+.icon-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.icon-btn:disabled { opacity: .25; cursor: default; }
+.field { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.field label { font-weight: 600; }
+input[type="date"] { background: var(--surface-2); border: 0; border-radius: 10px; padding: 8px 10px; min-height: 40px; }
+.foot { text-align: center; font-size: 12px; color: var(--muted); padding-top: 8px; }
+
+/* Tab bar */
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; display: flex; justify-content: center;
+  background: var(--bar); -webkit-backdrop-filter: saturate(180%) blur(16px); backdrop-filter: saturate(180%) blur(16px);
+  border-top: 1px solid var(--line); padding: 4px 8px calc(4px + env(safe-area-inset-bottom));
+}
+.tabbar-inner { display: flex; width: 100%; max-width: 520px; }
+.tab { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; font-size: 11px; font-weight: 650; color: var(--muted); }
+.tab svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tab[aria-selected="true"] { color: var(--accent); }
+
+/* Bottom sheet */
+.backdrop { position: fixed; inset: 0; z-index: 20; background: rgba(0, 0, 0, .4); opacity: 0; transition: opacity .25s; }
+.backdrop.open { opacity: 1; }
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 21; max-width: 520px; margin: 0 auto; max-height: 88vh; max-height: 88dvh; overflow: auto;
+  background: var(--surface); border-radius: 22px 22px 0 0; box-shadow: 0 -8px 32px rgba(0, 0, 0, .18);
+  padding: 8px 16px calc(16px + env(safe-area-inset-bottom)); transform: translateY(100%); transition: transform .3s cubic-bezier(.2, .8, .2, 1);
+}
+.sheet.open { transform: none; }
+.grabber { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 4px auto 14px; }
+.sheet h2 { font-size: 20px; font-weight: 750; margin-bottom: 14px; }
+.input { width: 100%; padding: 14px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--bg); font-size: 17px; }
+.input:focus { outline: none; border-color: var(--accent); }
+.input.bad { border-color: var(--danger); animation: shake .3s; }
+@keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+.label { font-size: 13px; font-weight: 650; color: var(--muted); margin: 16px 2px 8px; }
+.emoji-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 18px; }
+.emoji-grid button { aspect-ratio: 1; font-size: 24px; border-radius: 12px; background: var(--surface-2); }
+.emoji-grid button[aria-pressed="true"] { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+
+/* Toast & confetti */
+.toast {
+  position: fixed; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom)); z-index: 30; max-width: calc(100% - 32px);
+  transform: translate(-50%, 16px); opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s;
+  background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 99px; font-weight: 600; font-size: 14px; text-align: center;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.confetti { position: fixed; inset: 0; z-index: 40; pointer-events: none; overflow: hidden; }
+.confetti i { position: absolute; top: -12px; width: 8px; height: 12px; border-radius: 2px; animation: fall var(--d) cubic-bezier(.25, .6, .4, 1) forwards; }
+@keyframes fall { to { transform: translate(var(--x), 105vh) rotate(var(--r)); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <p class="banner" id="storage-warn" hidden>⚠️ This browser is blocking storage, so your progress can't be saved. Try opening the app in your regular browser (not a private tab).</p>
+
+  <section class="view" id="view-today">
+    <header class="top">
+      <div>
+        <p class="eyebrow" id="eyebrow"></p>
+        <h1 id="day-title"></h1>
+        <p class="date" id="day-date"></p>
+      </div>
+      <div class="ring" id="ring" role="img">
+        <svg viewBox="0 0 76 76" aria-hidden="true">
+          <circle class="ring-bg" cx="38" cy="38" r="30"/>
+          <circle class="ring-fg" id="ring-fg" cx="38" cy="38" r="30" stroke-dasharray="188.5" stroke-dashoffset="188.5" transform="rotate(-90 38 38)"/>
+        </svg>
+        <span class="ring-label" id="ring-label"></span>
+      </div>
+    </header>
+    <div class="strip" id="strip" role="group" aria-label="Choose a day"></div>
+    <div class="view" id="today-body"></div>
+  </section>
+
+  <section class="view" id="view-progress" hidden></section>
+  <section class="view" id="view-setup" hidden></section>
+</div>
+
+<nav class="tabbar" aria-label="Sections">
+  <div class="tabbar-inner" role="tablist">
+    <button type="button" class="tab" role="tab" data-action="tab" data-value="today">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16.2 9.5"/></svg>Today
+    </button>
+    <button type="button" class="tab" role="tab" data-action="tab" data-value="progress">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20v-6M12 20V5M19 20v-10"/></svg>Progress
+    </button>
+    <button type="button" class="tab" role="tab" data-action="tab" data-value="setup">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>Setup
+    </button>
+  </div>
+</nav>
+
+<div class="backdrop" id="backdrop" data-action="sheet-cancel" hidden></div>
+<form class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" autocomplete="off" novalidate hidden>
+  <div class="grabber"></div>
+  <h2 id="sheet-title">New habit</h2>
+  <input class="input" id="habit-name" maxlength="60" placeholder="e.g. Read 20 pages" enterkeyhint="done" aria-label="Habit name">
+  <p class="label">Icon</p>
+  <div class="emoji-grid" id="emoji-grid"></div>
+  <div class="row">
+    <button type="button" class="btn danger" id="sheet-delete" data-action="sheet-delete">Delete</button>
+    <button type="button" class="btn" data-action="sheet-cancel">Cancel</button>
+    <button type="submit" class="btn primary">Save</button>
+  </div>
+</form>
+
+<input type="file" id="import-file" accept="application/json,.json" hidden>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<noscript><p class="banner">Habit 30 needs JavaScript turned on.</p></noscript>
+
+<script>
+(() => {
+  'use strict';
+
+  const KEY = 'habit30';
+  const TIP_KEY = 'habit30.installTipDismissed';
+  const DEFAULT_START = '2026-10-01';
+  const LENGTH = 30;
+  const SUGGESTIONS = [
+    ['💧', 'Drink 8 glasses of water'], ['🏃', 'Exercise 30 minutes'], ['📖', 'Read 20 pages'],
+    ['🧘', 'Meditate 10 minutes'], ['😴', 'In bed by 11 pm'], ['🥗', 'Eat a healthy meal'],
+    ['🚶', 'Walk 10,000 steps'], ['📵', 'No phone for the first hour'], ['✍️', 'Write a journal entry'],
+    ['🍬', 'No added sugar'],
+  ];
+  const EMOJIS = ['✅', '💧', '🏃', '📖', '🧘', '😴', '🥗', '🚶', '📵', '✍️', '🍬', '💪',
+    '🧠', '🎯', '🌅', '🪥', '💊', '🎸', '🧹', '💰', '🌱', '🙏', '🍎', '💻'];
+  const CONFETTI = ['#2f7d5b', '#4fbf8b', '#f2b134', '#e86a5f', '#5b8def', '#b57edc'];
+  const RING_C = 2 * Math.PI * 30;
+  const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
+  const LONG_DATE = { weekday: 'long', month: 'long', day: 'numeric' };
+  const SHORT_DATE = { month: 'short', day: 'numeric' };
+  const ICON_UP = '<svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>';
+  const ICON_DOWN = '<svg viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></svg>';
+  const ICON_CHECK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
+  const $ = (sel) => document.querySelector(sel);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
+
+  // Dates are handled as local "YYYY-MM-DD" strings so they compare correctly as plain strings.
+  const pad = (n) => String(n).padStart(2, '0');
+  const iso = (d) => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  const parse = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+  const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return iso(d); };
+  const diffDays = (a, b) => {
+    const [ay, am, ad] = a.split('-').map(Number), [by, bm, bd] = b.split('-').map(Number);
+    return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 864e5);
+  };
+  const fmt = (s, opts) => parse(s).toLocaleDateString(undefined, opts);
+
+  // ---- Storage --------------------------------------------------------------
+  let storageOk = true;
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { storageOk = false; return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); return true; } catch { return false; } },
+  };
+
+  const blank = () => ({ v: 1, start: DEFAULT_START, habits: [], log: {} });
+
+  function normalize(d) {
+    const s = blank();
+    if (!d || typeof d !== 'object') return s;
+    if (ISO_RE.test(d.start)) s.start = d.start;
+    if (Array.isArray(d.habits)) {
+      s.habits = d.habits
+        .filter((h) => h && h.id && typeof h.name === 'string' && h.name.trim())
+        .map((h) => ({ id: String(h.id), name: h.name.trim().slice(0, 60), emoji: typeof h.emoji === 'string' && h.emoji ? h.emoji : '✅' }));
+    }
+    if (d.log && typeof d.log === 'object') {
+      for (const [date, ids] of Object.entries(d.log)) {
+        if (ISO_RE.test(date) && Array.isArray(ids) && ids.length) s.log[date] = ids.map(String);
+      }
+    }
+    return s;
+  }
+
+  function load() {
+    const raw = store.get(KEY);
+    if (!raw) return blank();
+    try { return normalize(JSON.parse(raw)); }
+    catch { store.set(KEY + '.corrupt', raw); return blank(); }
+  }
+
+  let state = load();
+
+  function save() {
+    storageOk = store.set(KEY, JSON.stringify(state));
+    $('#storage-warn').hidden = storageOk;
+  }
+
+  function askPersist() {
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persisted().then((p) => p || navigator.storage.persist()).catch(() => {});
+    }
+  }
+
+  // ---- Derived data ---------------------------------------------------------
+  const ui = { tab: 'today', today: iso(new Date()), selected: null, centered: null, editing: null, emoji: '✅', pop: null, installEvt: null };
+
+  function range() {
+    const dates = Array.from({ length: LENGTH }, (_, i) => addDays(state.start, i));
+    const ti = diffDays(state.start, ui.today); // index of today in the challenge (may be <0 or >=LENGTH)
+    return { dates, ti, elapsed: Math.max(0, Math.min(LENGTH, ti + 1)) };
+  }
+  const defaultSelected = ({ dates, ti }) => (ti < 0 ? dates[0] : ti >= LENGTH ? dates[LENGTH - 1] : ui.today);
+
+  const isDone = (date, id) => (state.log[date] || []).includes(id);
+  function doneCount(date) {
+    const done = state.log[date] || [];
+    return state.habits.reduce((n, h) => n + (done.includes(h.id) ? 1 : 0), 0);
+  }
+  const ratio = (date) => (state.habits.length ? doneCount(date) / state.habits.length : 0);
+  const level = (r) => (r <= 0 ? 0 : r >= 1 ? 4 : r <= 1 / 3 ? 1 : r <= 2 / 3 ? 2 : 3);
+
+  // Streaks over the days that have arrived so far. Today doesn't break a streak until it's over.
+  function runStats(test) {
+    const { dates, ti } = range(), last = Math.min(ti, LENGTH - 1);
+    let best = 0, run = 0, count = 0;
+    for (let i = 0; i <= last; i++) {
+      if (test(dates[i])) { count++; best = Math.max(best, ++run); } else run = 0;
+    }
+    let cur = 0, i = last;
+    if (ti === last && i >= 0 && !test(dates[i])) i--;
+    while (i >= 0 && test(dates[i])) { cur++; i--; }
+    return { cur, best, count };
+  }
+  const habitStats = (id) => runStats((d) => isDone(d, id));
+  const perfectStats = () => runStats((d) => state.habits.length > 0 && doneCount(d) === state.habits.length);
+
+  function overall({ dates, elapsed }) {
+    const n = state.habits.length;
+    let checks = 0;
+    for (let i = 0; i < elapsed; i++) checks += doneCount(dates[i]);
+    return n && elapsed ? Math.round((100 * checks) / (n * elapsed)) : 0;
+  }
+
+  // ---- Rendering ------------------------------------------------------------
+  function render() {
+    const r = range();
+    if (!r.dates.includes(ui.selected)) ui.selected = defaultSelected(r);
+    document.querySelectorAll('.app > .view').forEach((v) => { v.hidden = v.id !== 'view-' + ui.tab; });
+    document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.value === ui.tab)));
+    if (ui.tab === 'today') renderToday(r);
+    else if (ui.tab === 'progress') renderProgress(r);
+    else renderSetup(r);
+    $('#storage-warn').hidden = storageOk;
+  }
+
+  function renderToday(r) {
+    renderHead(r);
+    renderStrip(r);
+    renderTodayBody(r);
+    if (ui.centered !== ui.selected) {
+      centerStrip(ui.centered !== null);
+      ui.centered = ui.selected;
+    }
+    ui.pop = null;
+  }
+
+  function renderHead({ dates, ti }) {
+    const sel = ui.selected, n = state.habits.length, k = doneCount(sel);
+    const inRange = ti >= 0 && ti < LENGTH;
+    $('#eyebrow').textContent = ti < 0 ? 'Starts in ' + plural(-ti, 'day') : ti >= LENGTH ? 'Challenge complete' : LENGTH + '-day challenge';
+    $('#day-title').innerHTML = 'Day ' + (dates.indexOf(sel) + 1) + '<span class="of">of ' + LENGTH + '</span>';
+    $('#day-date').innerHTML = esc(fmt(sel, LONG_DATE)) +
+      (sel === ui.today ? ' <span class="pill">Today</span>'
+        : inRange ? ' <button type="button" class="pill" data-action="today">Back to today</button>' : '');
+    const ring = $('#ring');
+    ring.hidden = n === 0;
+    ring.classList.toggle('full', n > 0 && k === n);
+    ring.setAttribute('aria-label', k + ' of ' + n + ' habits done');
+    $('#ring-fg').style.strokeDashoffset = String(RING_C * (1 - (n ? k / n : 0)));
+    $('#ring-label').innerHTML = k + '<small>/' + n + '</small>';
+  }
+
+  function renderStrip({ dates }) {
+    const strip = $('#strip');
+    if (strip.dataset.start !== state.start || strip.children.length !== LENGTH) {
+      strip.dataset.start = state.start;
+      strip.innerHTML = dates.map((d, i) =>
+        '<button type="button" class="day" data-action="day" data-value="' + d + '" aria-label="Day ' + (i + 1) + ', ' + esc(fmt(d, LONG_DATE)) + '">' +
+        '<span class="dw">' + esc(fmt(d, { weekday: 'short' })) + '</span><span class="dn">' + parse(d).getDate() + '</span></button>').join('');
+    }
+    Array.from(strip.children).forEach((b, i) => {
+      const d = dates[i];
+      b.className = 'day lv' + (d > ui.today ? 'f' : level(ratio(d))) + (d === ui.today ? ' is-today' : '') + (d === ui.selected ? ' is-sel' : '');
+      b.setAttribute('aria-pressed', String(d === ui.selected));
+    });
+  }
+
+  function centerStrip(smooth) {
+    const strip = $('#strip'), b = strip.querySelector('.is-sel');
+    if (!b || !strip.clientWidth) return;
+    const left = b.offsetLeft - (strip.clientWidth - b.offsetWidth) / 2;
+    if (strip.scrollTo) strip.scrollTo({ left, behavior: smooth ? 'smooth' : 'auto' });
+    else strip.scrollLeft = left;
+  }
+
+  function chips(limit) {
+    const have = new Set(state.habits.map((h) => h.name.toLowerCase()));
+    const list = SUGGESTIONS.map((s, i) => [s, i]).filter(([s]) => !have.has(s[1].toLowerCase())).slice(0, limit || SUGGESTIONS.length);
+    if (!list.length) return '';
+    return '<div class="chips">' + list.map(([[emoji, name], i]) =>
+      '<button type="button" class="chip" data-action="suggest" data-value="' + i + '">' + emoji + ' ' + esc(name) + '</button>').join('') + '</div>';
+  }
+
+  function installTip() {
+    if (isStandalone() || location.protocol === 'file:' || store.get(TIP_KEY)) return '';
+    let text;
+    if (isIOS()) text = 'Add to your Home Screen: tap <b>Share</b> then <b>Add to Home Screen</b>.';
+    else if (ui.installEvt) text = 'Install Habit 30 for one-tap access, even offline. <button type="button" class="link" data-action="install">Install</button>';
+    else text = 'Add to your home screen from the browser menu <b>⋮</b> → <b>Add to Home screen</b>.';
+    return '<div class="banner"><span>📲</span><span class="grow">' + text + '</span>' +
+      '<button type="button" class="x" data-action="dismiss-tip" aria-label="Dismiss">×</button></div>';
+  }
+
+  function renderTodayBody(r) {
+    const { dates, ti } = r;
+    const sel = ui.selected, n = state.habits.length, future = sel > ui.today;
+    let h = '';
+    if (ti >= LENGTH) {
+      h += '<div class="card"><h2>🏆 You finished your 30 days!</h2>' +
+        '<p>' + overall(r) + '% of habits done, with ' + plural(perfectStats().count, 'perfect day') + '.</p>' +
+        '<button type="button" class="btn primary block" data-action="new-round">Start another 30 days</button></div>';
+    }
+    if (!n) {
+      h += '<div class="card"><h2>What do you want to build?</h2>' +
+        '<p>Pick a few habits to do every day for the next 30 days. Tap to add them. You can change them anytime.</p>' +
+        chips() + '<button type="button" class="btn primary block" data-action="add">✏️ Write your own</button></div>';
+      $('#today-body').innerHTML = h;
+      return;
+    }
+    if (future) {
+      h += '<p class="banner">🔒 ' + (ti < 0
+        ? 'Your 30 days start on ' + esc(fmt(dates[0], LONG_DATE)) + '. Come back then!'
+        : 'This day hasn’t happened yet.') + '</p>';
+    } else if (doneCount(sel) === n) {
+      h += '<p class="banner good">🎉 Perfect day! Every habit done.</p>';
+    }
+    h += installTip();
+    h += '<div class="section-head"><h2>Habits</h2><button type="button" class="link" data-action="tab" data-value="setup">Edit</button></div>';
+    h += '<ul class="habits">' + state.habits.map((hb) => {
+      const on = isDone(sel, hb.id), s = habitStats(hb.id);
+      const meta = [s.cur ? '🔥 ' + s.cur + '-day streak' : '', s.count + '/' + LENGTH + ' days'].filter(Boolean).join(' · ');
+      return '<li><button type="button" class="habit' + (on ? ' is-done' : '') + (ui.pop === hb.id ? ' pop' : '') + '"' +
+        ' data-action="toggle" data-value="' + esc(hb.id) + '" aria-pressed="' + on + '"' + (future ? ' disabled' : '') + '>' +
+        '<span class="emoji" aria-hidden="true">' + esc(hb.emoji) + '</span>' +
+        '<span class="body"><span class="name">' + esc(hb.name) + '</span><span class="meta">' + meta + '</span></span>' +
+        '<span class="check" aria-hidden="true">' + ICON_CHECK + '</span></button></li>';
+    }).join('') + '</ul>';
+    h += '<button type="button" class="add-card" data-action="add">＋ Add a habit</button>';
+    if (n < 4) {
+      const c = chips(4);
+      if (c) h += '<p class="sub">Quick add</p>' + c;
+    }
+    $('#today-body').innerHTML = h;
+  }
+
+  function renderProgress(r) {
+    const { dates, ti, elapsed } = r, n = state.habits.length;
+    const view = $('#view-progress');
+    let h = '<h1 class="page-title">Progress</h1>';
+    if (!n) {
+      view.innerHTML = h + '<div class="card empty"><p>Add a habit to start tracking.</p>' +
+        '<button type="button" class="btn primary" data-action="add">＋ Add a habit</button></div>';
+      return;
+    }
+    const ps = perfectStats();
+    const left = ti < 0 ? LENGTH : Math.max(0, LENGTH - ti);
+    h += '<div class="tiles">' +
+      tile('Completion', overall(r) + '%', elapsed ? 'over ' + plural(elapsed, 'day') : 'not started yet') +
+      tile('Perfect days', ps.count, 'every habit done') +
+      tile('Perfect streak', ps.cur, 'best ' + ps.best) +
+      tile('Days left', left, ti < 0 ? 'starts ' + fmt(dates[0], SHORT_DATE) : ti < LENGTH ? 'including today' : 'all done') +
+      '</div>';
+
+    const firstSunday = addDays(DEFAULT_START, 3); // 2026-10-04 is a Sunday
+    const lead = parse(dates[0]).getDay();
+    let cal = '';
+    for (let i = 0; i < 7; i++) cal += '<span class="wd">' + esc(fmt(addDays(firstSunday, i), { weekday: 'narrow' })) + '</span>';
+    for (let i = 0; i < lead; i++) cal += '<span></span>';
+    cal += dates.map((d, i) =>
+      '<button type="button" class="c lv' + (d > ui.today ? 'f' : level(ratio(d))) + (d === ui.today ? ' is-today' : '') + '"' +
+      ' data-action="cal-day" data-value="' + d + '" aria-label="Day ' + (i + 1) + ', ' + esc(fmt(d, LONG_DATE)) + ', ' + doneCount(d) + ' of ' + n + ' done">' +
+      parse(d).getDate() + '</button>').join('');
+    h += '<div class="card"><div class="cal-head"><h2>' + esc(fmt(dates[0], SHORT_DATE)) + ' – ' + esc(fmt(dates[LENGTH - 1], SHORT_DATE)) + '</h2>' +
+      '<div class="legend">Less <i class="lv0"></i><i class="lv1"></i><i class="lv2"></i><i class="lv3"></i><i class="lv4"></i> More</div></div>' +
+      '<div class="cal">' + cal + '</div></div>';
+
+    h += '<div class="section-head"><h2>By habit</h2></div>';
+    h += state.habits.map((hb) => {
+      const s = habitStats(hb.id), pct = elapsed ? Math.round((100 * s.count) / elapsed) : 0;
+      const cells = dates.map((d) => '<i class="' + (d > ui.today ? 'f' : isDone(d, hb.id) ? 'y' : '') + '"></i>').join('');
+      return '<article class="card hstat"><header><span class="emoji" aria-hidden="true">' + esc(hb.emoji) + '</span>' +
+        '<h3>' + esc(hb.name) + '</h3><strong>' + pct + '%</strong></header>' +
+        '<div class="cells" aria-hidden="true">' + cells + '</div>' +
+        '<p class="meta">' + s.count + ' of ' + plural(elapsed, 'day') + ' · 🔥 ' + s.cur + ' now · best streak ' + s.best + '</p></article>';
+    }).join('');
+    view.innerHTML = h;
+  }
+
+  const tile = (k, v, s) => '<div class="card tile"><p class="k">' + k + '</p><p class="v">' + v + '</p><p class="s">' + esc(s) + '</p></div>';
+
+  function renderSetup({ dates }) {
+    const n = state.habits.length;
+    let h = '<h1 class="page-title">Setup</h1>';
+    h += '<div class="section-head"><h2>Your habits</h2></div>';
+    if (n) {
+      h += '<ul class="list">' + state.habits.map((hb, i) =>
+        '<li><button type="button" class="hedit" data-action="edit" data-value="' + esc(hb.id) + '">' +
+        '<span class="emoji" aria-hidden="true">' + esc(hb.emoji) + '</span><span>' + esc(hb.name) + '</span></button>' +
+        '<button type="button" class="icon-btn" data-action="move" data-value="' + esc(hb.id) + '" data-dir="-1" aria-label="Move ' + esc(hb.name) + ' up"' + (i === 0 ? ' disabled' : '') + '>' + ICON_UP + '</button>' +
+        '<button type="button" class="icon-btn" data-action="move" data-value="' + esc(hb.id) + '" data-dir="1" aria-label="Move ' + esc(hb.name) + ' down"' + (i === n - 1 ? ' disabled' : '') + '>' + ICON_DOWN + '</button></li>').join('') + '</ul>';
+    }
+    h += '<button type="button" class="add-card" data-action="add">＋ Add a habit</button>';
+    const c = chips();
+    if (c) h += '<p class="sub">Ideas</p>' + c;
+
+    h += '<div class="section-head"><h2>Challenge</h2></div>';
+    h += '<div class="card"><div class="field"><label for="start-date">Start date</label>' +
+      '<input type="date" id="start-date" value="' + state.start + '"></div>' +
+      '<p>30 days: ' + esc(fmt(dates[0], LONG_DATE)) + ' to ' + esc(fmt(dates[LENGTH - 1], LONG_DATE)) + '.</p></div>';
+
+    h += '<div class="section-head"><h2>Your data</h2></div>';
+    h += '<div class="card"><p>Everything is saved on this phone only. Nothing is uploaded. Save a backup now and then so you don’t lose your streaks.</p>' +
+      '<div class="row"><button type="button" class="btn" data-action="export">Save backup</button>' +
+      '<button type="button" class="btn" data-action="import">Restore backup</button></div>' +
+      '<button type="button" class="btn danger block" data-action="reset">Erase everything</button></div>';
+
+    if (!isStandalone() && location.protocol !== 'file:') {
+      h += '<div class="section-head"><h2>Home screen</h2></div><div class="card">' +
+        (isIOS() ? '<p>In Safari, tap <b>Share</b> then <b>Add to Home Screen</b>. It then opens like an app and works offline.</p>'
+          : ui.installEvt ? '<p>Install Habit 30 to open it like an app. It works offline.</p><button type="button" class="btn primary block" data-action="install">Install app</button>'
+            : '<p>Open the browser menu <b>⋮</b> and choose <b>Add to Home screen</b> or <b>Install app</b>. It then opens like an app and works offline.</p>') +
+        '</div>';
+    }
+    h += '<p class="foot">Habit 30 · works offline · your data stays on this device</p>';
+    $('#view-setup').innerHTML = h;
+  }
+
+  // ---- Actions --------------------------------------------------------------
+  function setTab(tab) {
+    ui.tab = tab;
+    ui.centered = null;
+    render();
+    window.scrollTo(0, 0);
+  }
+
+  function select(date) {
+    if (ui.selected === date) return;
+    ui.selected = date;
+    render();
+  }
+
+  function toggle(id) {
+    const d = ui.selected;
+    if (d > ui.today || !state.habits.some((h) => h.id === id)) return;
+    const wasPerfect = ratio(d) === 1;
+    const set = new Set(state.log[d] || []);
+    const on = !set.has(id);
+    if (on) set.add(id); else set.delete(id);
+    if (set.size) state.log[d] = Array.from(set); else delete state.log[d];
+    save();
+    if (navigator.vibrate) navigator.vibrate(on ? 12 : 6);
+    ui.pop = on ? id : null;
+    render();
+    if (!wasPerfect && ratio(d) === 1) celebrate(d);
+  }
+
+  function celebrate(d) {
+    const { dates } = range();
+    confetti();
+    if (navigator.vibrate) navigator.vibrate([20, 40, 20]);
+    toast(d === dates[LENGTH - 1] ? 'Day 30 done. You made it! 🏆' : 'Perfect day! Every habit done 🎉');
+  }
+
+  function confetti() {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const box = document.createElement('div');
+    box.className = 'confetti';
+    box.setAttribute('aria-hidden', 'true');
+    for (let i = 0; i < 70; i++) {
+      const p = document.createElement('i');
+      p.style.left = Math.random() * 100 + '%';
+      p.style.background = CONFETTI[i % CONFETTI.length];
+      p.style.animationDelay = Math.random() * 0.25 + 's';
+      p.style.setProperty('--x', Math.random() * 160 - 80 + 'px');
+      p.style.setProperty('--r', Math.random() * 720 - 360 + 'deg');
+      p.style.setProperty('--d', 1.2 + Math.random() * 1.2 + 's');
+      box.appendChild(p);
+    }
+    document.body.appendChild(box);
+    setTimeout(() => box.remove(), 3000);
+  }
+
+  let toastTimer;
+  function toast(msg) {
+    const t = $('#toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+  }
+
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+  function addHabit(name, emoji) {
+    name = name.trim().slice(0, 60);
+    if (!name) return false;
+    if (state.habits.some((h) => h.name.toLowerCase() === name.toLowerCase())) { toast('You already have that habit'); return false; }
+    state.habits.push({ id: uid(), name, emoji: emoji || '✅' });
+    save();
+    askPersist();
+    toast('Added ' + (emoji || '✅') + ' ' + name);
+    return true;
+  }
+
+  function move(id, dir) {
+    const i = state.habits.findIndex((h) => h.id === id), j = i + dir;
+    if (i < 0 || j < 0 || j >= state.habits.length) return;
+    [state.habits[i], state.habits[j]] = [state.habits[j], state.habits[i]];
+    save();
+    render();
+  }
+
+  function deleteHabit(id) {
+    const h = state.habits.find((x) => x.id === id);
+    if (!h || !confirm('Delete “' + h.name + '” and all its check-ins?')) return;
+    state.habits = state.habits.filter((x) => x.id !== id);
+    for (const d of Object.keys(state.log)) {
+      state.log[d] = state.log[d].filter((x) => x !== id);
+      if (!state.log[d].length) delete state.log[d];
+    }
+    save();
+    closeSheet();
+    render();
+    toast('Deleted ' + h.name);
+  }
+
+  function openSheet(id) {
+    const h = state.habits.find((x) => x.id === id);
+    ui.editing = h ? h.id : 'new';
+    ui.emoji = h ? h.emoji : '✅';
+    $('#sheet-title').textContent = h ? 'Edit habit' : 'New habit';
+    const input = $('#habit-name');
+    input.value = h ? h.name : '';
+    input.classList.remove('bad');
+    $('#sheet-delete').hidden = !h;
+    renderEmojiGrid();
+    const sheet = $('#sheet'), backdrop = $('#backdrop');
+    sheet.hidden = false;
+    backdrop.hidden = false;
+    document.body.classList.add('locked');
+    requestAnimationFrame(() => requestAnimationFrame(() => { sheet.classList.add('open'); backdrop.classList.add('open'); }));
+    if (!h) setTimeout(() => input.focus(), 50);
+  }
+
+  function closeSheet() {
+    const sheet = $('#sheet'), backdrop = $('#backdrop');
+    if (document.activeElement && sheet.contains(document.activeElement)) document.activeElement.blur();
+    sheet.classList.remove('open');
+    backdrop.classList.remove('open');
+    document.body.classList.remove('locked');
+    ui.editing = null;
+    setTimeout(() => { if (!ui.editing) { sheet.hidden = true; backdrop.hidden = true; } }, 300);
+  }
+
+  function saveSheet() {
+    const input = $('#habit-name'), name = input.value.trim();
+    if (!name) {
+      input.classList.remove('bad');
+      void input.offsetWidth;
+      input.classList.add('bad');
+      input.focus();
+      return;
+    }
+    if (ui.editing === 'new') {
+      if (!addHabit(name, ui.emoji)) return;
+    } else {
+      const h = state.habits.find((x) => x.id === ui.editing);
+      if (h && state.habits.some((x) => x !== h && x.name.toLowerCase() === name.toLowerCase())) { toast('You already have that habit'); return; }
+      if (h) { h.name = name.slice(0, 60); h.emoji = ui.emoji; save(); }
+    }
+    closeSheet();
+    render();
+  }
+
+  function renderEmojiGrid() {
+    const list = EMOJIS.includes(ui.emoji) ? EMOJIS : [ui.emoji].concat(EMOJIS.slice(0, -1));
+    $('#emoji-grid').innerHTML = list.map((e) =>
+      '<button type="button" data-action="emoji" data-value="' + esc(e) + '" aria-label="Icon ' + esc(e) + '" aria-pressed="' + (e === ui.emoji) + '">' + esc(e) + '</button>').join('');
+  }
+
+  function exportData() {
+    const name = 'habit30-backup-' + ui.today + '.json';
+    const json = JSON.stringify(state, null, 2);
+    const download = () => {
+      const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      toast('Backup saved to your downloads');
+    };
+    let file = null;
+    try { file = new File([json], name, { type: 'application/json' }); } catch { /* older browsers */ }
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: 'Habit 30 backup' }).catch((e) => { if (e && e.name !== 'AbortError') download(); });
+    } else {
+      download();
+    }
+  }
+
+  function importData(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      let data;
+      try { data = JSON.parse(reader.result); } catch { toast('That file isn’t a Habit 30 backup'); return; }
+      const next = normalize(data);
+      if (!next.habits.length && !Object.keys(next.log).length) { toast('That backup is empty'); return; }
+      const days = Object.keys(next.log).length;
+      if (!confirm('Replace your current data with this backup? (' + plural(next.habits.length, 'habit') + ', ' + plural(days, 'day') + ' of check-ins)')) return;
+      state = next;
+      save();
+      ui.selected = null;
+      render();
+      toast('Backup restored');
+    };
+    reader.readAsText(file);
+  }
+
+  function reset() {
+    if (!confirm('Erase all habits and progress? This can’t be undone.')) return;
+    state = blank();
+    save();
+    ui.selected = null;
+    setTab('today');
+    toast('Everything erased');
+  }
+
+  function newRound() {
+    if (!confirm('Start a new 30 days from today? Your habits stay the same and start fresh.')) return;
+    state.start = ui.today;
+    save();
+    ui.selected = null;
+    render();
+  }
+
+  const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+  function install() {
+    const evt = ui.installEvt;
+    if (!evt) return;
+    evt.prompt();
+    evt.userChoice.finally(() => { ui.installEvt = null; render(); });
+  }
+
+  // ---- Events ---------------------------------------------------------------
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('[data-action]');
+    if (!t || t.disabled) return;
+    const v = t.dataset.value;
+    switch (t.dataset.action) {
+      case 'tab': setTab(v); break;
+      case 'toggle': toggle(v); break;
+      case 'day': select(v); break;
+      case 'cal-day': ui.tab = 'today'; ui.selected = v; ui.centered = null; render(); window.scrollTo(0, 0); break;
+      case 'today': select(ui.today); break;
+      case 'add': openSheet(); break;
+      case 'edit': openSheet(v); break;
+      case 'suggest': { const [emoji, name] = SUGGESTIONS[Number(v)]; if (addHabit(name, emoji)) render(); break; }
+      case 'move': move(v, Number(t.dataset.dir)); break;
+      case 'emoji': ui.emoji = v; renderEmojiGrid(); break;
+      case 'sheet-cancel': closeSheet(); break;
+      case 'sheet-delete': deleteHabit(ui.editing); break;
+      case 'export': exportData(); break;
+      case 'import': $('#import-file').click(); break;
+      case 'reset': reset(); break;
+      case 'install': install(); break;
+      case 'dismiss-tip': store.set(TIP_KEY, '1'); render(); break;
+      case 'new-round': newRound(); break;
+    }
+  });
+
+  $('#sheet').addEventListener('submit', (e) => { e.preventDefault(); saveSheet(); });
+  $('#habit-name').addEventListener('input', (e) => e.target.classList.remove('bad'));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && ui.editing) closeSheet(); });
+
+  document.addEventListener('change', (e) => {
+    if (e.target.id === 'start-date') {
+      if (ISO_RE.test(e.target.value)) { state.start = e.target.value; save(); ui.selected = null; toast('Start date updated'); }
+      render();
+    } else if (e.target.id === 'import-file') {
+      const file = e.target.files && e.target.files[0];
+      if (file) importData(file);
+      e.target.value = '';
+    }
+  });
+
+  // Roll over to the new day at midnight, or when the app is reopened on a later day.
+  function checkDate() {
+    const now = iso(new Date());
+    if (now === ui.today) return;
+    if (ui.selected === ui.today) ui.selected = null;
+    ui.today = now;
+    render();
+  }
+  setInterval(checkDate, 30000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkDate(); });
+
+  // Keep multiple open tabs in sync.
+  window.addEventListener('storage', (e) => { if (e.key === KEY) { state = load(); render(); } });
+
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); ui.installEvt = e; render(); });
+  window.addEventListener('appinstalled', () => { ui.installEvt = null; render(); toast('Installed! Find Habit 30 on your home screen'); });
+
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
