@@ -185,6 +185,14 @@ h1 .of { font-size: 20px; font-weight: 600; color: var(--muted); margin-left: 6p
 .field label { font-weight: 600; }
 input[type="date"] { background: var(--surface-2); border: 0; border-radius: 10px; padding: 8px 10px; min-height: 40px; }
 .foot { text-align: center; font-size: 12px; color: var(--muted); padding-top: 8px; }
+.card a { color: var(--accent); font-weight: 600; }
+.steps { margin: 0; padding-left: 22px; color: var(--muted); }
+.steps li + li { margin-top: 8px; }
+.steps b { color: var(--text); }
+.note { font-size: 13px; color: var(--muted); }
+.widget-stale { width: 100%; text-align: left; background: var(--accent-soft); }
+.widget-stale b { color: var(--accent); }
+.widget-ok { font-size: 13px; color: var(--muted); text-align: center; }
 
 /* Tab bar */
 .tabbar {
@@ -298,6 +306,8 @@ input[type="date"] { background: var(--surface-2); border: 0; border-radius: 10p
 
   const KEY = 'habit30';
   const TIP_KEY = 'habit30.installTipDismissed';
+  const WIDGET_KEY = 'habit30.widgetSent';
+  const WIDGET_SCRIPT = 'Habit30';
   const DEFAULT_START = '2026-10-01';
   const LENGTH = 30;
   const SUGGESTIONS = [
@@ -532,6 +542,7 @@ input[type="date"] { background: var(--surface-2); border: 0; border-radius: 10p
         '<span class="body"><span class="name">' + esc(hb.name) + '</span><span class="meta">' + meta + '</span></span>' +
         '<span class="check" aria-hidden="true">' + ICON_CHECK + '</span></button></li>';
     }).join('') + '</ul>';
+    h += widgetStatus();
     h += '<button type="button" class="add-card" data-action="add">＋ Add a habit</button>';
     if (n < 4) {
       const c = chips(4);
@@ -604,6 +615,24 @@ input[type="date"] { background: var(--surface-2); border: 0; border-radius: 10p
     h += '<div class="card"><div class="field"><label for="start-date">Start date</label>' +
       '<input type="date" id="start-date" value="' + state.start + '"></div>' +
       '<p>30 days: ' + esc(fmt(dates[0], LONG_DATE)) + ' to ' + esc(fmt(dates[LENGTH - 1], LONG_DATE)) + '.</p></div>';
+
+    if (!widgetSrc) loadWidgetSrc();
+    const sent = readWidgetSent();
+    h += '<div class="section-head"><h2>iPhone widget</h2></div>';
+    h += '<div class="card"><p>See your progress on your Home Screen with a large widget. It uses ' +
+      '<a href="https://apps.apple.com/app/scriptable/id1405459188" target="_blank" rel="noopener">Scriptable</a>, a free app.</p>' +
+      '<ol class="steps">' +
+      '<li>Install <b>Scriptable</b> from the App Store.</li>' +
+      '<li>Tap <b>Copy widget script</b> below. In Scriptable, tap <b>＋</b> and paste. Then tap the name at the top and rename it to <b>' + WIDGET_SCRIPT + '</b>.</li>' +
+      '<li>Touch and hold your Home Screen, tap <b>Edit</b> → <b>Add Widget</b>, choose <b>Scriptable</b>, swipe to the <b>large</b> size and tap <b>Add Widget</b>. ' +
+      'Then touch and hold the new widget, tap <b>Edit Widget</b>, and set <b>Script</b> to <b>' + WIDGET_SCRIPT + '</b>.</li>' +
+      '<li>Tap <b>Update widget</b> to send your progress. Do this after you check in. To come back here, tap <b>◀</b> in the top-left corner.</li>' +
+      '</ol>' +
+      '<div class="row"><button type="button" class="btn" data-action="copy-widget">Copy widget script</button>' +
+      '<button type="button" class="btn primary" data-action="sync-widget">Update widget</button></div>' +
+      (sent ? '<p class="note">Last sent ' + esc(new Date(sent.at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })) +
+        (sent.payload === widgetPayload() ? '. The widget is up to date.' : '. You’ve checked in since then.') + '</p>' : '') +
+      '</div>';
 
     h += '<div class="section-head"><h2>Your data</h2></div>';
     h += '<div class="card"><p>Everything is saved on this phone only. Nothing is uploaded. Save a backup now and then so you don’t lose your streaks.</p>' +
@@ -825,6 +854,59 @@ input[type="date"] { background: var(--surface-2); border: 0; border-radius: 10p
     toast('Everything erased');
   }
 
+  // ---- Home Screen widget (Scriptable) --------------------------------------
+  // The widget can't read this app's storage, so "Update widget" opens the Scriptable
+  // script with the current data in the URL, and the script saves it for the widget.
+  function widgetPayload() {
+    const log = {};
+    for (const d of range().dates) if (state.log[d]) log[d] = state.log[d];
+    return JSON.stringify({ v: 1, start: state.start, habits: state.habits, log });
+  }
+
+  function readWidgetSent() {
+    try { return JSON.parse(store.get(WIDGET_KEY)) || null; } catch { return null; }
+  }
+
+  function widgetStatus() {
+    const sent = readWidgetSent();
+    if (!sent) return '';
+    if (sent.payload === widgetPayload()) return '<p class="widget-ok">✓ Home Screen widget is up to date</p>';
+    return '<button type="button" class="banner widget-stale" data-action="sync-widget"><span>📱</span>' +
+      '<span class="grow">Your widget is behind. <b>Update widget</b></span></button>';
+  }
+
+  function syncWidget() {
+    if (!state.habits.length) { toast('Add a habit first'); return; }
+    const payload = widgetPayload();
+    store.set(WIDGET_KEY, JSON.stringify({ at: Date.now(), payload }));
+    render();
+    location.href = 'scriptable:///run/' + WIDGET_SCRIPT + '?data=' + encodeURIComponent(payload);
+  }
+
+  let widgetSrc = null;
+  function loadWidgetSrc() {
+    if (location.protocol === 'file:') return Promise.resolve(null);
+    return fetch('scriptable-widget.js')
+      .then((r) => (r.ok ? r.text() : null))
+      .then((t) => (widgetSrc = t))
+      .catch(() => null);
+  }
+
+  function copyWidget() {
+    const done = () => toast('Copied! Now paste it into Scriptable');
+    const fallback = () => { window.open('scriptable-widget.js', '_blank'); toast('Select all the text and copy it'); };
+    const clip = navigator.clipboard;
+    if (widgetSrc && clip && clip.writeText) {
+      clip.writeText(widgetSrc).then(done, fallback);
+    } else if (clip && clip.write && window.ClipboardItem) {
+      // Safari only allows copying during the tap, so hand it the pending download.
+      const blob = loadWidgetSrc().then((t) => { if (!t) throw new Error('missing'); return new Blob([t], { type: 'text/plain' }); });
+      clip.write([new ClipboardItem({ 'text/plain': blob })]).then(done, fallback);
+    } else {
+      fallback();
+    }
+  }
+
   function newRound() {
     if (!confirm('Start a new 30 days from today? Your habits stay the same and start fresh.')) return;
     state.start = ui.today;
@@ -867,6 +949,8 @@ input[type="date"] { background: var(--surface-2); border: 0; border-radius: 10p
       case 'install': install(); break;
       case 'dismiss-tip': store.set(TIP_KEY, '1'); render(); break;
       case 'new-round': newRound(); break;
+      case 'sync-widget': syncWidget(); break;
+      case 'copy-widget': copyWidget(); break;
     }
   });
 

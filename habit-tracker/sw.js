@@ -1,7 +1,7 @@
 /* Offline support for Habit 30. Serves the app from the cache so it opens with no
    network, and refreshes the cache in the background so updates show up next launch. */
-const CACHE = 'habit30-v1';
-const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png'];
+const CACHE = 'habit30-v2';
+const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png', './scriptable-widget.js'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
